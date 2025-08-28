@@ -47,13 +47,13 @@ class DataSourceSpec extends FunSuite {
     assertEquals(insert, 3)
 
     case class Count(count: Int)
-    given SqlRowEncoder.TypedEncoder[Count] = SqlRowEncoder.deriveFromResultSet[Count]()
+    given SqlRowEncoder.TypedEncoder[Count] = SqlRowEncoder.derive[Count]()
     val res = ds.read[Count](q"select count(*) as count from test_table")
     val count = res.headOption
     assertEquals(count, Some(Count(3)))
 
     case class TestRow(id: Int, name: String)
-    given SqlRowEncoder.TypedEncoder[TestRow] = SqlRowEncoder.deriveFromResultSet[TestRow]()
+    given SqlRowEncoder.TypedEncoder[TestRow] = SqlRowEncoder.derive[TestRow]()
     val rows = ds.read[TestRow](q"select id, name from test_table order by id")
     assertEquals(rows, List(TestRow(1, "test1"), TestRow(2, "test2"), TestRow(3, "test3")))
 
@@ -95,37 +95,35 @@ class DataSourceSpec extends FunSuite {
          """.stripMargin
     )
 
-
     case class Customer(customerId: Int, customerName: String, city: String, email: String)
     case class Order(orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
 
     given ColumnNameMapper = ColumnNameMapper.camelToSnake
 
-    given SqlRowEncoder.TypedEncoder[Customer] = SqlRowEncoder.deriveFromResultSet[Customer]()
-    given SqlRowEncoder.TypedEncoder[Order] = SqlRowEncoder.deriveFromResultSet[Order]()
+    given SqlRowEncoder.TypedEncoder[Customer] = SqlRowEncoder.derive[Customer]()
+    given SqlRowEncoder.TypedEncoder[Order] = SqlRowEncoder.derive[Order]()
 
     assertEquals(create, 0)
 
     // let use manual datasource to keep the transaction open
 
-
-      val rows1: Iterable[(Customer, Order)] = ds.read[(Customer, Order)](
-        q"""
+    val rows1: Iterable[(Customer, Order)] = ds.read[(Customer, Order)](
+      q"""
          |SELECT c.*, o.* FROM customers c
          |INNER JOIN orders o ON c.customer_id = o.customer_id
          |WHERE c.customer_id IN(${List(1, 2, 3, 4).?})""".stripMargin
-      )
+    )
 
-      val rows2 = ds.read[Order](q"SELECT * FROM orders WHERE customer_id = ${1}")
+    val rows2 = ds.read[Order](q"SELECT * FROM orders WHERE customer_id = ${1}")
 
-      // group by customer
-      // create map of customer to list of orders
-      val res: Map[Customer, Iterable[Order]] = rows1.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
+    // group by customer
+    // create map of customer to list of orders
+    val res: Map[Customer, Iterable[Order]] = rows1.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
-      // we have 3 customers with orders
-      assertEquals(res.size, 3)
+    // we have 3 customers with orders
+    assertEquals(res.size, 3)
 
-      // customer 1 has 3 orders
-      assertEquals(res.find(_._1.customerId == 1).get._2.toList, rows2)
+    // customer 1 has 3 orders
+    assertEquals(res.find(_._1.customerId == 1).get._2.toList, rows2)
   }
 }
