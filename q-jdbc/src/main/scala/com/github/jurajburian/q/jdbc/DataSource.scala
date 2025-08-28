@@ -127,7 +127,7 @@ trait AutoDataSource extends DataSource {
     * @return
     *   an instance of [[ManualManagedWriteDataSource]] for manual transaction management
     */
-  def manualylManagedWriteDataSource: ManuallyManaged & WriteDataSource
+  def manuallyManagedWriteDataSource: ManuallyManaged & WriteDataSource
 }
 
 trait CloseableDataSource extends AutoDataSource with Closeable

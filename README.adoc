@@ -38,5 +38,3 @@ ind build.sbt and add dependency to your project:
 ----
  "com.github.jurajburian" %% "q-jdbc" % "0.0.0-SNAPSHOT" withSources
 ----
-
-
