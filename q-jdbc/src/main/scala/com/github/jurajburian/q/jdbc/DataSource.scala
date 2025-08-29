@@ -21,7 +21,7 @@ trait ReadDataSource {
     * @return
     *   iterable of typed results
     */
-  def read[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T]
+  def apply[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T]
 
   /** Executes a read-only SQL statement and returns typed results in closeable iterator
     *
@@ -34,7 +34,7 @@ trait ReadDataSource {
     * @return
     *   iterator of typed results, if not fully consumed, it must be closed to release resources
     */
-  def readLazy[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T]
+  def manual[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T]
 
 }
 
@@ -53,7 +53,7 @@ trait WriteDataSource {
     * @return
     *   iterable of typed results
     */
-  def write[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T]
+  def apply[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T]
 
   /** Executes a read-write SQL statement and returns typed results
     *
@@ -66,7 +66,7 @@ trait WriteDataSource {
     * @return
     *   iterator of typed results, if not fully consumed, it must be closed to release resources
     */
-  def writeLazy[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T]
+  def manual[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T]
 
   /** Executes an update SQL statement
     * @param sql
@@ -102,32 +102,21 @@ trait ManuallyManaged {
   def close(): Unit
 }
 
-/** Represents a data source that can execute SQL statements
+/** Provides access to unmanaged read and write data sources that require manual transaction management.
   */
-trait DataSource extends ReadDataSource with WriteDataSource
-
-
-/** Represents a data source that can automatically manage transactions for read and write operations.
-  */
-trait AutoDataSource extends DataSource {
-
-  /** Provides access to a manually managed read only data source.
-    *
-    * This allows for executing multiple operations within a single transaction context.
-    *
-    * @return
-    * an instance of [[ManuallyManaged & ReadDataSource]] for manual transaction management
-    */
-  def manuallyManagedReadDataSource: ManuallyManaged & ReadDataSource
-
-  /** Provides access to a manually managed read-write data source.
-    *
-    * This allows for executing multiple operations within a single transaction context.
-    *
-    * @return
-    *   an instance of [[ManualManagedWriteDataSource]] for manual transaction management
-    */
-  def manuallyManagedWriteDataSource: ManuallyManaged & WriteDataSource
+trait WriteUnmanaged {
+  def unmanaged: WriteDataSource & ManuallyManaged
 }
 
-trait CloseableDataSource extends AutoDataSource with Closeable
+/** Provides access to unmanaged read data sources that require manual transaction management.
+  */
+trait ReadUnmanaged {
+  def unmanaged: ReadDataSource & ManuallyManaged
+}
+
+/** Represents a data source that can execute both read-only and read-write SQL statements as well as update statements.
+  */
+trait CloseableDataSource extends Closeable {
+  val read: ReadDataSource & ReadUnmanaged
+  val write: WriteDataSource & WriteUnmanaged
+}

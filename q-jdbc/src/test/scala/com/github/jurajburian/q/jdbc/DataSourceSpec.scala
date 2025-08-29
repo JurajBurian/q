@@ -39,23 +39,23 @@ class DataSourceSpec extends FunSuite {
     def testTableData = List("test1", "test2", "test3")
 
     def createTestTables(): Int = {
-      ds.update(
+      ds.write.update(
         q"""create table if not exists test_table (id serial primary key, name varchar(100) not null)"""
       )
     }
 
     def insertTestTable(): Int = {
-      ds.update(q"""insert into test_table (name) values
+      ds.write.update(q"""insert into test_table (name) values
            |${testTableData.map(p => s"('$p')").mkString(",\n").!}""".stripMargin)
     }
 
     def dropTestTable(): Int = {
-      ds.update(
+      ds.write.update(
         q"drop table if exists test_table"
       )
     }
 
-    test("sql executor execute selects mapped to case classes") {
+    test("selects mapped to case classes should return valid values") {
 
       assertEquals(createTestTables(), 0)
       assertEquals(insertTestTable(), 3)
@@ -81,7 +81,7 @@ class DataSourceSpec extends FunSuite {
       assertEquals(dropTestTable(), 0)
     }
 
-    test("sql executor should execute selects mapped to Named tuples") {
+    test("selects mapped to Named tuples should return valid values") {
 
       assertEquals(createTestTables(), 0)
       assertEquals(insertTestTable(), 3)
@@ -118,7 +118,7 @@ class DataSourceSpec extends FunSuite {
   {
 
     def createTestTablesWithData(): Int = {
-      ds.update(
+      ds.write.update(
         q"""
            |CREATE TABLE customers (
            |    customer_id INT PRIMARY KEY,
@@ -149,12 +149,12 @@ class DataSourceSpec extends FunSuite {
     }
 
     def dropTestTables(): Int = {
-      ds.update(
+      ds.write.update(
         q"drop table if exists orders; drop table if exists customers"
       )
     }
 
-    test("sql executor should execute joined select mapped to case classes in tuples") {
+    test("joined select mapped to case classes in tuples should return valid values") {
 
       assertEquals(createTestTablesWithData(), 0)
 
@@ -188,7 +188,7 @@ class DataSourceSpec extends FunSuite {
       assertEquals(dropTestTables(), 0)
     }
 
-    test("sql executor should execute joined select mapped to Named tuples in tuples") {
+    test("joined select mapped to Named tuples in tuples should return valid values") {
 
       assertEquals(createTestTablesWithData(), 0)
 

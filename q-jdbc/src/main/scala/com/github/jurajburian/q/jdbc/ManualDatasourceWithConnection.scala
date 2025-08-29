@@ -170,7 +170,7 @@ private[jdbc] case class ManuallyReadDatasourceWithConnection(connection: Connec
     extends ManuallyManagedImpl(connection)
     with ReadDataSource {
 
-  override def read[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T] = try {
+  override def apply[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T] = try {
     setProperties(readOnly = true)
     val statement = connection.prepareStatement(sql.query)
     bindStatement(sql, statement)
@@ -179,7 +179,7 @@ private[jdbc] case class ManuallyReadDatasourceWithConnection(connection: Connec
     if (autoClose) close()
   }
 
-  override def readLazy[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T] = {
+  override def manual[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T] = {
     setProperties(readOnly = true)
     val statement = connection.prepareStatement(sql.query)
     bindStatement(sql, statement)
@@ -192,7 +192,7 @@ private[jdbc] case class ManuallyWriteDatasourceWithConnection(connection: Conne
     extends ManuallyManagedImpl(connection)
     with WriteDataSource {
 
-  override def write[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T] = try {
+  override def apply[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T] = try {
     setProperties(readOnly = false)
     val statement = connection.prepareStatement(sql.query)
     bindStatement(sql, statement)
@@ -201,7 +201,7 @@ private[jdbc] case class ManuallyWriteDatasourceWithConnection(connection: Conne
     if (autoClose) close()
   }
 
-  override def writeLazy[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T] = {
+  override def manual[T](sql: Q)(using deserializer: ResultSet => T): CloseableIterator[T] = {
     setProperties(readOnly = false)
     val statement = connection.prepareStatement(sql.query)
     bindStatement(sql, statement)
