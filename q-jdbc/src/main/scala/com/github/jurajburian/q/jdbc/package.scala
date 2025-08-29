@@ -1,6 +1,6 @@
 package com.github.jurajburian.q
 
-import com.github.jurajburian.q.jdbc.SqlRowEncoder
+import com.github.jurajburian.q.jdbc.SqlRowDecoder
 import java.sql.ResultSet
 import scala.language.postfixOps
 
@@ -107,19 +107,19 @@ package object jdbc {
   /** Tuple 2 support
     */
   given [X, Y](using
-      x: SqlRowEncoder.TypedEncoder[X],
-      y: SqlRowEncoder.TypedEncoder[Y]
-  ): SqlRowEncoder.TypedEncoder[(X, Y)] with {
+               x: SqlRowDecoder.TypedDecoder[X],
+               y: SqlRowDecoder.TypedDecoder[Y]
+  ): SqlRowDecoder.TypedDecoder[(X, Y)] with {
     def apply(rs: ResultSet): (X, Y) = (x(rs), y(rs))
   }
 
   /** Tuple 3 support
     */
   given [X, Y, Z](using
-      x: SqlRowEncoder.TypedEncoder[X],
-      y: SqlRowEncoder.TypedEncoder[Y],
-      z: SqlRowEncoder.TypedEncoder[Z]
-  ): SqlRowEncoder.TypedEncoder[(X, Y, Z)] with {
+                  x: SqlRowDecoder.TypedDecoder[X],
+                  y: SqlRowDecoder.TypedDecoder[Y],
+                  z: SqlRowDecoder.TypedDecoder[Z]
+  ): SqlRowDecoder.TypedDecoder[(X, Y, Z)] with {
     def apply(rs: ResultSet): (X, Y, Z) = (x(rs), y(rs), z(rs))
   }
 }
