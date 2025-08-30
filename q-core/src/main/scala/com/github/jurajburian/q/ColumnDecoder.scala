@@ -7,7 +7,7 @@ package com.github.jurajburian.q
  * @tparam F
  *   type of the row, for example  [[java.sql.ResultSet]]
  */
-trait ColumnEncoder[T, F]  {
+trait ColumnDecoder[T, F]  {
 
   /** Converts a row into an instance of type T
    *

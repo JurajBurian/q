@@ -2,7 +2,7 @@ package com.github.jurajburian.q
 
 import scala.deriving.Mirror
 import scala.quoted.*
-import com.github.jurajburian.q.ColumnEncoder
+import com.github.jurajburian.q.ColumnDecoder
 
 type FieldNameMap = Map[String, String]
 
@@ -35,26 +35,26 @@ trait FDecoder[F] {
       columnNameMapper: ColumnNameMapper = ColumnNameMapper.noTransform
   ): TypedDecoder[T] = {
 
-    if (!(EncoderMacros.isNamedTuple[T] || EncoderMacros.isProduct[T])) {
-      EncoderMacros.reportError("Type T is not a Product (case class) nor NamedTuple")
+    if (!(Macros.isNamedTuple[T] || Macros.isProduct[T])) {
+      Macros.reportError("Type T is not a Product (case class) nor NamedTuple")
     }
 
-    val fieldNames = if (EncoderMacros.isProduct[T]) {
-      EncoderMacros
+    val fieldNames = if (Macros.isProduct[T]) {
+      Macros
         .getProductFieldNames[T]
         .map {
           case Left(fieldName)  => fieldName
           case Right(fieldName) => fieldNameMap.getOrElse(fieldName, columnNameMapper(fieldName))
         }
     } else {
-      EncoderMacros
+      Macros
         .getNamedTupleFieldNames[T]
         .map(fieldName => fieldNameMap.getOrElse(fieldName, columnNameMapper(fieldName)))
     }
-    val encoders = if (EncoderMacros.isProduct[T]) {
-      EncoderMacros.summonEncodersForProduct[T, F]
+    val encoders = if (Macros.isProduct[T]) {
+      Macros.summonEncodersForProduct[T, F]
     } else {
-      EncoderMacros.summonEncodersForNamedTuple[T, F]
+      Macros.summonEncodersForNamedTuple[T, F]
     }
     (rs: F) => {
       val values = fieldNames.zip(encoders).map { case (fieldName, encoder) =>
@@ -65,7 +65,7 @@ trait FDecoder[F] {
   }
 }
 
-object EncoderMacros {
+object Macros {
 
   inline def isProduct[T]: Boolean = ${ isProductImpl[T] }
 
@@ -76,12 +76,12 @@ object EncoderMacros {
     Expr(isProduct)
   }
 
-  inline def summonEncodersForProduct[T, F](using mirror: Mirror.ProductOf[T]): List[ColumnEncoder[?, F]] =
+  inline def summonEncodersForProduct[T, F](using mirror: Mirror.ProductOf[T]): List[ColumnDecoder[?, F]] =
     ${ summonEncodersForProductImpl[T, F]('mirror) }
 
   private def summonEncodersForProductImpl[T: Type, F: Type](
       mirror: Expr[Mirror.ProductOf[T]]
-  )(using Quotes): Expr[List[ColumnEncoder[?, F]]] = {
+  )(using Quotes): Expr[List[ColumnDecoder[?, F]]] = {
     import quotes.reflect.*
 
     val tpe = TypeRepr.of[T]
@@ -92,9 +92,9 @@ object EncoderMacros {
       case p         => report.errorAndAbort(s"Unexpected tree for param: ${p.show}")
     })
     val encoders = fieldTypes.map { fieldType =>
-      val encoderType = TypeRepr.of[ColumnEncoder].appliedTo(List(fieldType, TypeRepr.of[F]))
+      val encoderType = TypeRepr.of[ColumnDecoder].appliedTo(List(fieldType, TypeRepr.of[F]))
       Implicits.search(encoderType) match {
-        case result: ImplicitSearchSuccess => result.tree.asExprOf[ColumnEncoder[?, F]]
+        case result: ImplicitSearchSuccess => result.tree.asExprOf[ColumnDecoder[?, F]]
         case _ => report.errorAndAbort(s"Could not summon ColumnEncoder for type: ${fieldType.show}")
       }
     }
@@ -130,12 +130,12 @@ object EncoderMacros {
     '{ $seq.toList }
   }
 
-  inline def summonEncodersForNamedTuple[T, F]: List[ColumnEncoder[?, F]] =
+  inline def summonEncodersForNamedTuple[T, F]: List[ColumnDecoder[?, F]] =
     ${ summonEncodersForNamedTupleImpl[T, F] }
 
   private def summonEncodersForNamedTupleImpl[T: Type, F: Type](using
       Quotes
-  ): Expr[List[ColumnEncoder[?, F]]] = {
+  ): Expr[List[ColumnDecoder[?, F]]] = {
     import quotes.reflect.*
 
     val tr = TypeRepr.of[T].dealias
@@ -150,9 +150,9 @@ object EncoderMacros {
         report.errorAndAbort(s"Type ${tr.show} is not a NamedTuple type")
     }
     val encoders = fieldTypes.map { fieldType =>
-      val encoderType = TypeRepr.of[ColumnEncoder].appliedTo(List(fieldType, TypeRepr.of[F]))
+      val encoderType = TypeRepr.of[ColumnDecoder].appliedTo(List(fieldType, TypeRepr.of[F]))
       Implicits.search(encoderType) match {
-        case result: ImplicitSearchSuccess => result.tree.asExprOf[ColumnEncoder[?, F]]
+        case result: ImplicitSearchSuccess => result.tree.asExprOf[ColumnDecoder[?, F]]
         case _ => report.errorAndAbort(s"Could not summon ColumnEncoder for type: ${fieldType.show}")
       }
     }
