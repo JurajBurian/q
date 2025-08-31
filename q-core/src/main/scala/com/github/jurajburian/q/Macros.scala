@@ -3,23 +3,67 @@ package com.github.jurajburian.q
 import scala.deriving.Mirror
 import scala.quoted.*
 
+private[q] object MacrosUtils {
+
+  def isProduct(using Quotes)(tpe: quotes.reflect.TypeRepr): Boolean = {
+    import quotes.reflect.*
+    tpe.dealias <:< TypeRepr.of[Product]
+  }
+
+  def isNamedTuple(using Quotes)(tpe: quotes.reflect.TypeRepr): Boolean = {
+    import quotes.reflect.*
+    val tr = tpe.dealias
+    tr match {
+      case AppliedType(tpe, _) if tpe.typeSymbol.fullName.startsWith("scala.NamedTuple") => true
+      case _                                                                             => false
+    }
+  }
+
+  def getNamedTupleFieldNames(using Quotes)(tpe: quotes.reflect.TypeRepr): List[String] = {
+    import quotes.reflect.*
+    tpe.dealias match {
+      case AppliedType(tpe, args) if tpe.typeSymbol.fullName.startsWith("scala.NamedTuple") =>
+        args.head match {
+          case t: TypeRepr =>
+            t.typeArgs.toList.map { p =>
+              p.asInstanceOf[ConstantType].constant.value.toString()
+            }
+        }
+      case _ =>
+        report.errorAndAbort(s"Type ${tpe.show} is not a NamedTuple type")
+    }
+  }
+
+  def getProductFieldNames[T: Type](using Quotes)(tpe: quotes.reflect.TypeRepr): List[String | (String, String)] = {
+    import quotes.reflect.*
+    val annotation = TypeRepr.of[QAlias].typeSymbol
+    val classSymbol = tpe.classSymbol.get
+    tpe.typeSymbol.primaryConstructor.paramSymss.flatten.map { sym =>
+      val fieldName = sym.name.toString()
+      sym
+        .getAnnotation(annotation)
+        .map { case Apply(_, list) =>
+          val c = list.head.asInstanceOf[Literal].constant.value.toString
+          (fieldName, c.toString)
+        }
+        .getOrElse(fieldName)
+    }
+  }
+}
+
 object Macros {
 
   inline def isProduct[T]: Boolean = ${ isProductImpl[T] }
 
   private def isProductImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect.*
-    val tpe = TypeRepr.of[T]
-    val isProduct = tpe <:< TypeRepr.of[Product]
-    Expr(isProduct)
+    Expr(MacrosUtils.isProduct(TypeRepr.of[T]))
   }
 
-  inline def summonEncodersForProduct[T, F](using mirror: Mirror.ProductOf[T]): List[ColumnDecoder[?, F]] =
-    ${ summonEncodersForProductImpl[T, F]('mirror) }
+  inline def summonEncodersForProduct[T, F]: List[ColumnDecoder[?, F]] =
+    ${ summonEncodersForProductImpl[T, F] }
 
-  private def summonEncodersForProductImpl[T: Type, F: Type](
-      mirror: Expr[Mirror.ProductOf[T]]
-  )(using Quotes): Expr[List[ColumnDecoder[?, F]]] = {
+  private def summonEncodersForProductImpl[T: Type, F: Type](using Quotes): Expr[List[ColumnDecoder[?, F]]] = {
 
     import quotes.reflect.*
 
@@ -41,32 +85,21 @@ object Macros {
     Expr.ofList(encoders)
   }
 
-  /** @param mirror
-    *   a mirror
-    * @tparam T
+  /** @tparam T
     *   product type
     * @return
     *   list of Either values, left value can't be transformed, Right value is open for transformation
     */
-  inline def getProductFieldNames[T](using mirror: Mirror.ProductOf[T]): List[Either[String, String]] =
-    ${ getProductFieldNamesImpl[T]('mirror) }
+  inline def getProductFieldNames[T]: List[String | (String, String)] =
+    ${ getProductFieldNamesImpl[T] }
 
-  private def getProductFieldNamesImpl[T: Type](
-      mirror: Expr[Mirror.ProductOf[T]]
-  )(using Quotes): Expr[List[Either[String, String]]] = {
+  private def getProductFieldNamesImpl[T: Type](using Quotes): Expr[List[String | (String, String)]] = {
     import quotes.reflect.*
-    val annot = TypeRepr.of[QAlias].typeSymbol
-    val classSymbol = TypeRepr.of[T].classSymbol.get
-    val tuples = TypeRepr.of[T].typeSymbol.primaryConstructor.paramSymss.flatten.map { sym =>
-      val fieldNameExpr = Expr(sym.name.asInstanceOf[String])
-      if (sym.hasAnnotation(annot)) {
-        val annotExpr = sym.getAnnotation(annot).get.asExprOf[QAlias]
-        '{ Left[String, String]($annotExpr.name) }
-      } else {
-        '{ Right[String, String]($fieldNameExpr) }
-      }
+    val names = MacrosUtils.getProductFieldNames(TypeRepr.of[T]).map {
+      case p: String           => Expr(p)
+      case x: (String, String) => Expr(x)
     }
-    val seq: Expr[Seq[Either[String, String]]] = Expr.ofSeq(tuples)
+    val seq = Expr.ofSeq(names)
     '{ $seq.toList }
   }
 
@@ -96,7 +129,6 @@ object Macros {
         case _ => report.errorAndAbort(s"Could not summon ColumnEncoder for type: ${fieldType.show}")
       }
     }
-
     Expr.ofList(encoders)
   }
 
@@ -105,12 +137,7 @@ object Macros {
 
   private def isNamedTupleImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect.*
-    val tr = TypeRepr.of[T].dealias
-    val isNamedTuple = tr match {
-      case AppliedType(tpe, _) if tpe.typeSymbol.fullName.startsWith("scala.NamedTuple") => true
-      case _                                                                             => false
-    }
-    Expr(isNamedTuple)
+    Expr(MacrosUtils.isNamedTuple(TypeRepr.of[T]))
   }
 
   inline def getNamedTupleFieldNames[T]: List[String] =
@@ -118,17 +145,26 @@ object Macros {
 
   private def getNamedTupleFieldNamesImpl[T: Type](using Quotes): Expr[List[String]] = {
     import quotes.reflect.*
-    val tr = TypeRepr.of[T].dealias
-    val names = tr match {
-      case AppliedType(tpe, args) if tpe.typeSymbol.fullName.startsWith("scala.NamedTuple") =>
-        args.head match {
-          case t: TypeRepr =>
-            t.typeArgs.toList.map { p =>
-              Expr(p.asInstanceOf[ConstantType].constant.value.toString())
-            }
-        }
-      case _ =>
-        report.errorAndAbort(s"Type ${tr.show} is not a NamedTuple type")
+    val names = MacrosUtils.getNamedTupleFieldNames(TypeRepr.of[T]).map(Expr(_))
+    val seq = Expr.ofSeq(names)
+    '{ $seq.toList }
+  }
+
+  inline def getAttributeNames[T]: List[(String | (String, String))] = ${ getAttributeNamesImpl[T] }
+
+  private def getAttributeNamesImpl[T: Type](using Quotes): Expr[List[(String | (String, String))]] = {
+    import quotes.reflect.*
+    val tpe = TypeRepr.of[T]
+    val names = if (MacrosUtils.isNamedTuple(tpe)) {
+      MacrosUtils.getNamedTupleFieldNames(tpe).map { Expr(_) }
+    } else if (MacrosUtils.isProduct(tpe)) {
+      MacrosUtils.getProductFieldNames(tpe).map {
+        case p: String           => Expr(p)
+        case x: (String, String) => Expr(x)
+      }
+    } else {
+      report.errorAndAbort("Type T is not a Product (case class) nor NamedTuple")
+      Nil
     }
     val seq = Expr.ofSeq(names)
     '{ $seq.toList }

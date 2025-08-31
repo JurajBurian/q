@@ -44,8 +44,10 @@ trait FDecoder[F] {
       Macros
         .getProductFieldNames[T]
         .map {
-          case Left(fieldName)  => fieldName
-          case Right(fieldName) => fieldNameMap.getOrElse(fieldName, columnNameMapper(fieldName))
+          case (_: String, mappedFieldName: String) =>
+            mappedFieldName
+          case fieldName: String =>
+            fieldNameMap.getOrElse(fieldName, columnNameMapper(fieldName))
         }
     } else {
       Macros
