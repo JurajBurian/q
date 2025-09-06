@@ -7,6 +7,7 @@ val v = new {
   val Postgresql = "42.7.6"
   val HikariCP = "6.3.0"
   val Cassandra = "4.19.0"
+  val Zio = "2.1.21"
 }
 
 ThisBuild / version := "0.0.0-SNAPSHOT"
@@ -26,7 +27,7 @@ ThisBuild / scalacOptions ++= Seq(
 
 lazy val `q-root` = (project in file("."))
   .settings(publishLocal := {}, publish := {}, publishArtifact := false)
-  .aggregate(`q-core`, `q-jdbc`, `q-cassandra`)
+  .aggregate(`q-core`, `q-jdbc`, `q-cassandra`, `q-jdbc-zio`)
 
 lazy val `q-core` = (project in file("q-core"))
   .settings(
@@ -56,3 +57,12 @@ lazy val `q-cassandra` = (project in file("q-cassandra"))
     )
   )
   .dependsOn(`q-core`)
+
+lazy val `q-jdbc-zio` = (project in file("q-jdbc-zio"))
+  .settings(
+    name := "q-jdbc-zio",
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio" % v.Zio,
+    )
+  )
+  .dependsOn(`q-jdbc`)
