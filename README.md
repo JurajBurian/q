@@ -1,14 +1,15 @@
-= Q
+# Q
 
 Q is a data abstraction library designed to simplify requests and processing from multiple sources developed solely in Scala 3. Offering a consistent API for both querying, updating and inserting data.
 The initial release will be focuses on relational databases. The future support is planned for Cassandra.
 
-== Introduction
+## Introduction
+
 Q use string interpolation to build queries. +
 Result of query is mapped to case class or tuple of several case classes. +
 Library suport several ways to extends functionality, one can easily create extensions, or custom dsl.
 
-== How to start with development using Q.
+## How to start with development using Q.
 
 For now library is not published to maven central. But we have plan to do it in near future.
 
@@ -21,20 +22,14 @@ User needs to have:
 5. Docker installed (for running integration test)
 
 Here is step-by-step guide how to start with local development of Q or how to use it in your project:
-
-[source,bash]
-----
+```bash
 git clone https://github.com/JurajBurian/q.git
-----
+```
 
-[source,bash]
-----
-cd q
+```bash
 sbt clean compile test publishLocal
-----
-
-ind build.sbt and add dependency to your project:
-[source,scala]
-----
- "com.github.jurajburian" %% "q-jdbc" % "0.0.0-SNAPSHOT" withSources
-----
+````
+Add dependency to your project:
+```scala
+"com.github.jurajburian" %% "q-jdbc" % "0.0.0-SNAPSHOT" withSources
+```

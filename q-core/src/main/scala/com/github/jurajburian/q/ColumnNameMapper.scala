@@ -14,6 +14,7 @@ object ColumnNameMapper {
     * @return
     */
   val camelToSnake: ColumnNameMapper = (p: String) => {
+    // not a nice code, but well performing
     @tailrec
     def rec(idx: Int = 0, res: StringBuilder = new StringBuilder): String = if (p.length > idx) {
       val f = p(idx)

@@ -1,12 +1,14 @@
 package com.github.jurajburian.q.jdbc
 
 import com.github.jurajburian.q
-import com.github.jurajburian.q.*
-import com.github.jurajburian.q.jdbc.*
+import q.*
+import q.jdbc.*
 import com.zaxxer.hikari
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import munit.FunSuite
+
+import java.time.{Instant, LocalDate}
 
 class DataSourceSpec extends FunSuite {
 
@@ -34,7 +36,7 @@ class DataSourceSpec extends FunSuite {
     ds.close()
   }
 
-  {
+  { // first block of tests
 
     def testTableData = List("test1", "test2", "test3")
 
@@ -115,9 +117,17 @@ class DataSourceSpec extends FunSuite {
       assertEquals(dropTestTable(), 0)
     }
   }
-  {
 
-    def createTestTablesWithData(): Int = {
+  { // second block of tests
+
+    type Customer = (customerId: Int, customerName: String, city: String, email: String)
+    type Order = (orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
+
+    given ColumnNameMapper = ColumnNameMapper.camelToSnake
+    given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
+    given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
+
+    def createTestTablesWithData(): Iterable[Order] = {
       ds.write.update(
         q"""
            |CREATE TABLE customers (
@@ -127,7 +137,7 @@ class DataSourceSpec extends FunSuite {
            |    email VARCHAR(100)
            |);
            |CREATE TABLE orders (
-           |    order_id INT PRIMARY KEY,
+           |    order_id SERIAL PRIMARY KEY,
            |    customer_id INT,
            |    order_date DATE NOT NULL,
            |    amount DECIMAL(10, 2) NOT NULL,
@@ -138,14 +148,22 @@ class DataSourceSpec extends FunSuite {
            |(2, 'Jane Doe', 'Boston', 'jane@email.com'),
            |(3, 'Bob Johnson', 'Chicago', 'bob@email.com'),
            |(4, 'Alice Brown', 'New York', 'alice@email.com');
-           |INSERT INTO orders (order_id, customer_id, order_date, amount) VALUES
-           |(101, 1, '2023-10-01', 150.00),
-           |(102, 1, '2023-10-05', 75.50),
-           |(103, 2, '2023-10-02', 200.00),
-           |(104, 3, '2023-10-03', 50.00),
-           |(105, 1, '2023-10-10', 125.00);
          """.stripMargin
       )
+
+      val bd = LocalDate.parse("2025-01-01")
+
+      // TODO - not working with named tuples !!!
+      val orders = List(
+        (1, bd, 150.00),
+        (1, bd.plusDays(1), 75.50),
+        (2, bd.plusDays(2), 200.00),
+        (3, bd.plusDays(4), 50.00),
+        (1, bd.plusDays(5), 125.00)
+      )
+      val orderProjection = attrProjection[Order](Set("orderId"))
+
+      ds.write[Order](q"INSERT INTO orders ($orderProjection) VALUES ${orders.??} returning *")
     }
 
     def dropTestTables(): Int = {
@@ -156,15 +174,8 @@ class DataSourceSpec extends FunSuite {
 
     test("joined select mapped to case classes in tuples should return valid values") {
 
-      assertEquals(createTestTablesWithData(), 0)
-
-      type Customer = (customerId: Int, customerName: String, city: String, email: String)
-      type Order = (orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
-
-      given ColumnNameMapper = ColumnNameMapper.camelToSnake
-
-      given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
-      given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
+      val orders = createTestTablesWithData()
+      println(orders.toList)
 
       val rows1: Iterable[(Customer, Order)] = ds.read(
         q"""
@@ -190,29 +201,26 @@ class DataSourceSpec extends FunSuite {
 
     test("joined select mapped to Named tuples in tuples should return valid values") {
 
-      assertEquals(createTestTablesWithData(), 0)
+      val orders = createTestTablesWithData()
 
-      case class Customer(customerId: Int, customerName: String, city: String, email: String)
-      case class Order(orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
+      case class CustomerCC(customerId: Int, customerName: String, city: String, email: String)
+      case class OrderCC(orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
 
-      given ColumnNameMapper = ColumnNameMapper.camelToSnake
+      given SqlRowDecoder.TypedDecoder[CustomerCC] = SqlRowDecoder.derive[CustomerCC]()
+      given SqlRowDecoder.TypedDecoder[OrderCC] = SqlRowDecoder.derive[OrderCC]()
 
-      given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
-
-      given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
-
-      val rows1: Iterable[(Customer, Order)] = ds.read(
+      val rows1: Iterable[(CustomerCC, OrderCC)] = ds.read(
         q"""
          |SELECT c.*, o.* FROM customers c
          |INNER JOIN orders o ON c.customer_id = o.customer_id
-         |WHERE c.customer_id IN(${List(1, 2, 3, 4).?})""".stripMargin
+         |WHERE ${"c.customer_id".inOrFalse(List(1, 2, 3, 4))}""".stripMargin
       )
 
-      val rows2: Iterable[Order] = ds.read(q"SELECT * FROM orders WHERE customer_id = ${1}")
+      val rows2: Iterable[OrderCC] = ds.read(q"SELECT * FROM orders WHERE customer_id = ${1}")
 
       // group by customer
       // create map of customer to list of orders
-      val res: Map[Customer, Iterable[Order]] = rows1.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
+      val res: Map[CustomerCC, Iterable[OrderCC]] = rows1.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
       // we have 3 customers with orders
       assertEquals(res.size, 3)

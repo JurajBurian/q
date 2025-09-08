@@ -85,7 +85,6 @@ private[jdbc] trait ManuallyManagedImpl(connection: Connection) extends Manually
     */
   protected def bindStatement(q: Q, statement: PreparedStatement): Unit = {
     var idx = 1
-    @inline
     def index() = {
       val ret = idx
       idx = idx + 1
@@ -121,6 +120,7 @@ private[jdbc] trait ManuallyManagedImpl(connection: Connection) extends Manually
       case v: java.time.LocalTime     => statement.setTime(index(), java.sql.Time.valueOf(v))
       case v: java.time.LocalDateTime => statement.setTimestamp(index(), java.sql.Timestamp.valueOf(v))
       case v: java.time.Instant       => statement.setTimestamp(index(), java.sql.Timestamp.from(v))
+      case v: java.util.TimeZone      => statement.setString(index(), v.getID)
 
       // Binary data
       case v: Array[Byte]         => statement.setBytes(index(), v)
