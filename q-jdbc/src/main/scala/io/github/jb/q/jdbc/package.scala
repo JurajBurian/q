@@ -34,7 +34,7 @@ package object jdbc {
 
   given ColumnDecoder[Double, ResultSet] with {
     def from(rs: ResultSet, fieldName: String): Double = {
-      println("get: "  + rs.getDouble(fieldName))
+      println("get: " + rs.getDouble(fieldName))
       rs.getDouble(fieldName)
     }
     def as(x: Any): Double = x.asInstanceOf[Double]
@@ -63,6 +63,11 @@ package object jdbc {
   given ColumnDecoder[java.sql.Time, ResultSet] with {
     def from(rs: ResultSet, fieldName: String): java.sql.Time = rs.getTime(fieldName)
     def as(x: Any): java.sql.Time = x.asInstanceOf[java.sql.Time]
+  }
+
+  given ColumnDecoder[java.time.Instant, ResultSet] with {
+    def from(rs: ResultSet, fieldName: String): java.time.Instant = rs.getTimestamp(fieldName).toInstant
+    def as(x: Any): java.time.Instant = x.asInstanceOf[java.time.Instant]
   }
 
   given ColumnDecoder[java.sql.Timestamp, ResultSet] with {
