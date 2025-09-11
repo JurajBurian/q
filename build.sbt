@@ -6,6 +6,7 @@ val v = new {
   val Testcontainers = "1.21.3"
   val Postgresql = "42.7.6"
   val HikariCP = "6.3.0"
+  val Cassandra = "4.19.0"
 }
 
 ThisBuild / version := "0.0.0-SNAPSHOT"
@@ -25,7 +26,7 @@ ThisBuild / scalacOptions ++= Seq(
 
 lazy val `q-root` = (project in file("."))
   .settings(publishLocal := {}, publish := {}, publishArtifact := false)
-  .aggregate(`q-core`, `q-jdbc`)
+  .aggregate(`q-core`, `q-jdbc`, `q-cassandra`)
 
 lazy val `q-core` = (project in file("q-core"))
   .settings(
@@ -37,12 +38,21 @@ lazy val `q-core` = (project in file("q-core"))
 
 lazy val `q-jdbc` = (project in file("q-jdbc"))
   .settings(
-    name := "q-relational",
     libraryDependencies ++= Seq(
       "com.zaxxer" % "HikariCP" % v.HikariCP withSources,
       "org.scalameta" %% "munit" % v.Munit % Test withSources,
       "org.postgresql" % "postgresql" % v.Postgresql % Test withSources,
       "org.testcontainers" % "postgresql" % v.Testcontainers % Test withSources
+    )
+  )
+  .dependsOn(`q-core`)
+
+lazy val `q-cassandra` = (project in file("q-cassandra"))
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.apache.cassandra" % "java-driver-core" % v.Cassandra withSources,
+      "org.scalameta" %% "munit" % v.Munit % Test withSources,
+      "org.testcontainers" % "cassandra" % v.Testcontainers % Test withSources
     )
   )
   .dependsOn(`q-core`)
