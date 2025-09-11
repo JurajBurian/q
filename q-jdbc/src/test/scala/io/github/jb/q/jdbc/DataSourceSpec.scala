@@ -64,11 +64,11 @@ class DataSourceSpec extends FunSuite {
 
       case class Count(count: Int)
 
-      given SqlRowDecoder.TypedDecoder[Count] = SqlRowDecoder.derive()
+      given RowDecoder.TypedDecoder[Count] = RowDecoder.derive()
 
       case class TestRow(id: Int, name: String)
 
-      given SqlRowDecoder.TypedDecoder[TestRow] = SqlRowDecoder.derive()
+      given RowDecoder.TypedDecoder[TestRow] = RowDecoder.derive()
 
       val res = ds.read[Count](q"select count(*) as count from test_table")
       val count = res.headOption
@@ -90,11 +90,11 @@ class DataSourceSpec extends FunSuite {
 
       type Count = (count: Int)
 
-      given SqlRowDecoder.TypedDecoder[Count] = SqlRowDecoder.derive()
+      given RowDecoder.TypedDecoder[Count] = RowDecoder.derive()
 
       type TestRow = (id: Int, name: String)
 
-      given SqlRowDecoder.TypedDecoder[TestRow] = SqlRowDecoder.derive()
+      given RowDecoder.TypedDecoder[TestRow] = RowDecoder.derive()
 
       // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       // Warning: when using Named tuple with single argument, the type must be specified explicitly on the right side
@@ -123,7 +123,7 @@ class DataSourceSpec extends FunSuite {
     given ColumnNameMapper = ColumnNameMapper.camelToSnake
 
     def createTestTablesWithData[T](projection: NBV)(using
-        decoder: SqlRowDecoder.TypedDecoder[T]
+        decoder: RowDecoder.TypedDecoder[T]
     ): Iterable[T] = {
       ds.write.update(
         q"""
@@ -174,9 +174,9 @@ class DataSourceSpec extends FunSuite {
       type Customer = (customerId: Int, customerName: String, city: String, email: String)
       type Order = (orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
 
-      given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
+      given RowDecoder.TypedDecoder[Customer] = RowDecoder.derive[Customer]()
 
-      given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
+      given RowDecoder.TypedDecoder[Order] = RowDecoder.derive[Order]()
 
       val orders = createTestTablesWithData[Order](attrProjection[Order](Set("orderId")))
 
@@ -209,8 +209,8 @@ class DataSourceSpec extends FunSuite {
       case class Customer(customerId: Int, customerName: String, city: String, email: String)
       case class Order(orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
 
-      given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
-      given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
+      given RowDecoder.TypedDecoder[Customer] = RowDecoder.derive[Customer]()
+      given RowDecoder.TypedDecoder[Order] = RowDecoder.derive[Order]()
 
       val orders = createTestTablesWithData[Order](attrProjection[Order](Set("orderId")))
 
@@ -243,7 +243,7 @@ class DataSourceSpec extends FunSuite {
 
     case class TestData(id: Int, name: String, date: LocalDate, score: BigDecimal)
 
-    given SqlRowDecoder.TypedDecoder[TestData] = SqlRowDecoder.derive()
+    given RowDecoder.TypedDecoder[TestData] = RowDecoder.derive()
 
     val random = new Random()
     val names = Array("A", "B", "C", "D")

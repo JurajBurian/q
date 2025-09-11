@@ -28,7 +28,7 @@ case class HikariDataSource(private val hikariDataSource: hikari.HikariDataSourc
       *   iterable of typed results
       */
     override def apply[T](sql: Q)(using deserializer: ResultSet => T): Iterable[T] =
-      ManuallyReadDatasourceWithConnection(hikariDataSource.getConnection, binder, true).apply(sql)
+      ManuallyReadDatasourceWithConnection(hikariDataSource.getConnection, binder, true)(sql)
 
     /** Executes a read-only SQL statement and returns typed results in closeable iterator
       *

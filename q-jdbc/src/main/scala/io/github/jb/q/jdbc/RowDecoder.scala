@@ -5,4 +5,4 @@ import java.sql.ResultSet
 
 /** Decoder for [[java.sql.ResultSet]]
   */
-object SqlRowDecoder extends FDecoder[ResultSet]
+object RowDecoder extends FDecoder[ResultSet]
