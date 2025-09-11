@@ -2,6 +2,7 @@ package com.github.jurajburian.q.jdbc
 
 import com.github.jurajburian.q.*
 
+import java.io.Closeable
 import java.sql.{Connection, PreparedStatement, ResultSet}
 
 /** Function to bind parameters to prepared statement
@@ -54,10 +55,12 @@ private[jdbc] trait ManuallyManagedImpl(connection: Connection) extends Manually
   protected def executeTypedLazy[T](statement: PreparedStatement, autoClose: Boolean)(using
       deserializer: ResultSet => T
   ): CloseableIterator[T] = {
-    new Iterator[T] with AutoCloseable {
+    new Iterator[T] with Closeable with Closed {
       private val resultSet = statement.executeQuery()
       private var hasNextResult: Boolean = resultSet.next()
 
+      override def isClosed: Boolean = resultSet.isClosed
+      
       override def hasNext: Boolean = {
         hasNextResult
       }

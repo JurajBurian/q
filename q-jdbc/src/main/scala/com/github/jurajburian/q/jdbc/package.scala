@@ -7,7 +7,8 @@ import scala.language.postfixOps
 package object jdbc {
 
   given ColumnDecoder[Int, ResultSet] with {
-    def from(rs: ResultSet, fieldName: String): Int = rs.getInt(fieldName)
+    def from(rs: ResultSet, fieldName: String): Int =
+      rs.getInt(fieldName)
     def as(x: Any): Int = x.asInstanceOf[Int]
   }
 
@@ -32,7 +33,10 @@ package object jdbc {
   }
 
   given ColumnDecoder[Double, ResultSet] with {
-    def from(rs: ResultSet, fieldName: String): Double = rs.getDouble(fieldName)
+    def from(rs: ResultSet, fieldName: String): Double = {
+      println("get: "  + rs.getDouble(fieldName))
+      rs.getDouble(fieldName)
+    }
     def as(x: Any): Double = x.asInstanceOf[Double]
   }
 
@@ -107,8 +111,8 @@ package object jdbc {
   /** Tuple 2 support
     */
   given [X, Y](using
-               x: SqlRowDecoder.TypedDecoder[X],
-               y: SqlRowDecoder.TypedDecoder[Y]
+      x: SqlRowDecoder.TypedDecoder[X],
+      y: SqlRowDecoder.TypedDecoder[Y]
   ): SqlRowDecoder.TypedDecoder[(X, Y)] with {
     def apply(rs: ResultSet): (X, Y) = (x(rs), y(rs))
   }
@@ -116,9 +120,9 @@ package object jdbc {
   /** Tuple 3 support
     */
   given [X, Y, Z](using
-                  x: SqlRowDecoder.TypedDecoder[X],
-                  y: SqlRowDecoder.TypedDecoder[Y],
-                  z: SqlRowDecoder.TypedDecoder[Z]
+      x: SqlRowDecoder.TypedDecoder[X],
+      y: SqlRowDecoder.TypedDecoder[Y],
+      z: SqlRowDecoder.TypedDecoder[Z]
   ): SqlRowDecoder.TypedDecoder[(X, Y, Z)] with {
     def apply(rs: ResultSet): (X, Y, Z) = (x(rs), y(rs), z(rs))
   }

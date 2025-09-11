@@ -2,7 +2,6 @@ package com.github.jurajburian.q.jdbc
 
 import com.github.jurajburian.q.*
 
-import scala.NamedTuple.NamedTuple
 import scala.annotation.{nowarn, targetName}
 import scala.collection.immutable
 
@@ -15,12 +14,10 @@ import scala.collection.immutable
   *   The collection of values for the "IN" clause. Can be an Array or Iterable.
   * @param empty
   *   If true and the collection is empty, generates "1=1". If false, generates "1=0".
-  * @tparam Q
-  *   The type of the resulting SQL query.
   * @return
   *   A SQL query representing the safe "IN" clause.
   */
-private def in(columnName: String, value: (Array[?] | Iterable[?]), empty: Boolean = false): Q = {
+private def in(columnName: String, value: Array[?] | Iterable[?], empty: Boolean = false): Q = {
   val it = value match {
     case arr: Array[?]   => immutable.ArraySeq.unsafeWrapArray(arr)
     case it: Iterable[?] => it
@@ -37,8 +34,8 @@ private def in(columnName: String, value: (Array[?] | Iterable[?]), empty: Boole
   * "select * from table where id in ${columnName.inOrFalse(Array(1, 2, 3))}" }}
   */
 extension (columnName: String) {
-  def inOrFalse(value: (Array[?] | Iterable[?])): Q = in(columnName, value, empty = false)
-  def inOrTrue(value: (Array[?] | Iterable[?])): Q = in(columnName, value, empty = true)
+  def inOrFalse(value: Array[?] | Iterable[?]): Q = in(columnName, value)
+  def inOrTrue(value: Array[?] | Iterable[?]): Q = in(columnName, value, true)
 }
 
 /** extension method that converts java.time.ZoneId to SQL time zone using: " at time zone 'TimeZoneId'" so value is not
@@ -48,7 +45,8 @@ extension (timeZone: java.time.ZoneId) {
   def at = q"at time zone ${timeZone.getId}"
 }
 
-/** @param excludes
+/** calculate projection of attributes for case class or named tuple, attributes are separated by comma
+  * @param excludes
   *   excluded fields
   * @param fieldNameMap
   *   custom mapping if necessary
@@ -62,22 +60,25 @@ extension (timeZone: java.time.ZoneId) {
 inline def attrProjection[T](excludes: Set[String] = Set.empty, fieldNameMap: FieldNameMap = Map.empty)(using
     columnNameMapper: ColumnNameMapper = ColumnNameMapper.noTransform
 ) = {
-  val excl = excludes.toSet
   @nowarn("msg=New anonymous class definition will be duplicated at each inline site")
   val names = Macros.getAttributeNames[T].collect {
-    case (fn: String, mfn: String) if !excl.contains(fn) => mfn
-    case fn: String if !excl.contains(fn)                => fieldNameMap.getOrElse(fn, columnNameMapper(fn))
+    case (fn: String, mfn: String) if !excludes.contains(fn) => mfn
+    case fn: String if !excludes.contains(fn)                => fieldNameMap.getOrElse(fn, columnNameMapper(fn))
   }
   names.mkString(",").!
 }
 
+/** extension method that converts iterable of case class or named tuple to SQL values list in form : (?, ...,?) ... (?,
+  * ...,?)
+  */
 extension [T](it: Iterable[T]) {
   @targetName("namesOfTuple")
   def ?? : Q = {
     val q = it
       .map {
         case p: Product => q",(${p.productIterator.?})"
-        case other =>
+        case other      =>
+          // TODO how to write T to avoid runtime exceptions ?
           throw new IllegalArgumentException(s"Unsupported type: ${other.getClass}")
       }
       .reduce(_ + _)

@@ -4,7 +4,11 @@ import com.github.jurajburian.q.*
 import java.io.Closeable
 import java.sql.{PreparedStatement, ResultSet, Savepoint}
 
-type CloseableIterator[T] = AutoCloseable & Iterator[T]
+trait Closed {
+  def isClosed: Boolean
+}
+
+type CloseableIterator[T] = Closeable & Closed & Iterator[T]
 
 /** Represents a data source that can execute read-only SQL statements
   */

@@ -9,6 +9,7 @@ import org.testcontainers.utility.DockerImageName
 import munit.FunSuite
 
 import java.time.{Instant, LocalDate}
+import scala.util.{Random, Try}
 
 class DataSourceSpec extends FunSuite {
 
@@ -120,14 +121,11 @@ class DataSourceSpec extends FunSuite {
 
   { // second block of tests
 
-    type Customer = (customerId: Int, customerName: String, city: String, email: String)
-    type Order = (orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
-
     given ColumnNameMapper = ColumnNameMapper.camelToSnake
-    given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
-    given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
 
-    def createTestTablesWithData(): Iterable[Order] = {
+    def createTestTablesWithData[T](projection: NBV)(using
+        decoder: SqlRowDecoder.TypedDecoder[T]
+    ): Iterable[T] = {
       ds.write.update(
         q"""
            |CREATE TABLE customers (
@@ -153,17 +151,17 @@ class DataSourceSpec extends FunSuite {
 
       val bd = LocalDate.parse("2025-01-01")
 
-      // TODO - not working with named tuples !!!
-      val orders = List(
+      type InsertOrder = (customerId: Int, orderDate: java.time.LocalDate, amount: BigDecimal)
+
+      val orders: List[InsertOrder] = List(
         (1, bd, 150.00),
         (1, bd.plusDays(1), 75.50),
         (2, bd.plusDays(2), 200.00),
         (3, bd.plusDays(4), 50.00),
         (1, bd.plusDays(5), 125.00)
       )
-      val orderProjection = attrProjection[Order](Set("orderId"))
 
-      ds.write[Order](q"INSERT INTO orders ($orderProjection) VALUES ${orders.??} returning *")
+      ds.write[T](q"INSERT INTO orders ($projection) VALUES ${orders.??} returning *")
     }
 
     def dropTestTables(): Int = {
@@ -172,10 +170,16 @@ class DataSourceSpec extends FunSuite {
       )
     }
 
-    test("joined select mapped to case classes in tuples should return valid values") {
+    test("joined select mapped to case classes should return valid values") {
 
-      val orders = createTestTablesWithData()
-      println(orders.toList)
+      type Customer = (customerId: Int, customerName: String, city: String, email: String)
+      type Order = (orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
+
+      given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
+
+      given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
+
+      val orders = createTestTablesWithData[Order](attrProjection[Order](Set("orderId")))
 
       val rows1: Iterable[(Customer, Order)] = ds.read(
         q"""
@@ -185,6 +189,8 @@ class DataSourceSpec extends FunSuite {
       )
 
       val rows2: Iterable[Order] = ds.read(q"SELECT * FROM orders WHERE customer_id = ${1}")
+
+      assertEquals(rows2, orders.filter(_.customerId == 1))
 
       // group by customer
       // create map of customer to list of orders
@@ -199,28 +205,30 @@ class DataSourceSpec extends FunSuite {
       assertEquals(dropTestTables(), 0)
     }
 
-    test("joined select mapped to Named tuples in tuples should return valid values") {
+    test("joined select mapped to Named tuples should return valid values") {
 
-      val orders = createTestTablesWithData()
+      case class Customer(customerId: Int, customerName: String, city: String, email: String)
+      case class Order(orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
 
-      case class CustomerCC(customerId: Int, customerName: String, city: String, email: String)
-      case class OrderCC(orderId: Int, customerId: Int, orderDate: java.sql.Date, amount: BigDecimal)
+      given SqlRowDecoder.TypedDecoder[Customer] = SqlRowDecoder.derive[Customer]()
+      given SqlRowDecoder.TypedDecoder[Order] = SqlRowDecoder.derive[Order]()
 
-      given SqlRowDecoder.TypedDecoder[CustomerCC] = SqlRowDecoder.derive[CustomerCC]()
-      given SqlRowDecoder.TypedDecoder[OrderCC] = SqlRowDecoder.derive[OrderCC]()
+      val orders = createTestTablesWithData[Order](attrProjection[Order](Set("orderId")))
 
-      val rows1: Iterable[(CustomerCC, OrderCC)] = ds.read(
+      val rows1: Iterable[(Customer, Order)] = ds.read(
         q"""
          |SELECT c.*, o.* FROM customers c
          |INNER JOIN orders o ON c.customer_id = o.customer_id
          |WHERE ${"c.customer_id".inOrFalse(List(1, 2, 3, 4))}""".stripMargin
       )
 
-      val rows2: Iterable[OrderCC] = ds.read(q"SELECT * FROM orders WHERE customer_id = ${1}")
+      val rows2: Iterable[Order] = ds.read(q"SELECT * FROM orders WHERE customer_id = ${1}")
+
+      assertEquals(rows2, orders.filter(_.customerId == 1))
 
       // group by customer
       // create map of customer to list of orders
-      val res: Map[CustomerCC, Iterable[OrderCC]] = rows1.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
+      val res: Map[Customer, Iterable[Order]] = rows1.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
       // we have 3 customers with orders
       assertEquals(res.size, 3)
@@ -230,5 +238,75 @@ class DataSourceSpec extends FunSuite {
 
       assertEquals(dropTestTables(), 0)
     }
+  }
+
+  { // third block of tests
+
+    case class TestData(id: Int, name: String, date: LocalDate, score: BigDecimal)
+
+    given SqlRowDecoder.TypedDecoder[TestData] = SqlRowDecoder.derive()
+
+    val random = new Random()
+    val names = Array("A", "B", "C", "D")
+
+    val testData: List[TestData] = (1 to 100).map { i =>
+      TestData(i, names(i % 4), LocalDate.now().minusDays(i), BigDecimal.decimal(random.nextDouble()))
+    }.toList
+
+    def createTable(): Int = {
+      ds.write.update(
+        q"""
+           |CREATE TABLE test_table (
+           |    id INT PRIMARY KEY,
+           |    name VARCHAR(100) NOT NULL,
+           |    date DATE NOT NULL,
+           |    score NUMERIC NOT NULL
+           |);
+         """.stripMargin
+      )
+    }
+
+    def insertData(): CloseableIterator[TestData] = {
+      ds.write.manual[TestData](
+        q"INSERT INTO test_table (${attrProjection[TestData]()}) VALUES ${testData.??} returning *"
+      )
+    }
+
+    def dropTable() = ds.write.update(q"drop table if exists test_table")
+
+    test(
+      "inserting data using manual should return valid values and close connection when manual after iteration of all elements"
+    ) {
+      assertEquals(createTable(), 0)
+      val it = insertData()
+      assertEquals(it.isClosed, false)
+      val data = it.toList
+      assertEquals(it.isClosed, true)
+      assertEquals(data, testData)
+      assertEquals(dropTable(), 0)
+    }
+
+    test("during insert data using manual - when iterator is closed, read data should fail") {
+      assertEquals(createTable(), 0)
+      val it = insertData()
+      it.close()
+      assertEquals(it.isClosed, true)
+      val res = Try(it.toList)
+      assertEquals(res.isFailure, true)
+      assertEquals(dropTable(), 0)
+    }
+
+    test("insert, select in one transaction for unmanaged should pass") {
+      assertEquals(createTable(), 0)
+      val wds = ds.write.unmanaged
+      try {
+        val res1 = wds[TestData](
+          q"INSERT INTO test_table (${attrProjection[TestData]()}) VALUES ${testData.??} returning *"
+        )
+        val res2 = wds[TestData](q"SELECT * from test_table")
+        assertEquals(res1, res2)
+      } finally { wds.close() }
+    }
+
   }
 }

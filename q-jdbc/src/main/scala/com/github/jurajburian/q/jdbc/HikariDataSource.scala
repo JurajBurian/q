@@ -114,39 +114,64 @@ object HikariDataSource {
       case v: Char   => statement.setString(index(), v.toString)
 
       // Numeric types
-      case v: Boolean              => statement.setBoolean(index(), v)
-      case v: Int                  => statement.setInt(index(), v)
-      case v: Long                 => statement.setLong(index(), v)
-      case v: Float                => statement.setFloat(index(), v)
-      case v: Double               => statement.setDouble(index(), v)
-      case v: Short                => statement.setShort(index(), v)
-      case v: Byte                 => statement.setByte(index(), v)
-      case v: java.math.BigDecimal => statement.setBigDecimal(index(), v)
-      case v: BigDecimal           => statement.setBigDecimal(index(), v.bigDecimal)
+      case v: Boolean =>
+        statement.setBoolean(index(), v)
+      case v: Int =>
+        statement.setInt(index(), v)
+      case v: Long =>
+        statement.setLong(index(), v)
+      case v: Float =>
+        statement.setFloat(index(), v)
+      case v: Double =>
+        println("set: " + v)
+        statement.setDouble(index(), v)
+      case v: Short =>
+        statement.setShort(index(), v)
+      case v: Byte =>
+        statement.setByte(index(), v)
+      case v: java.math.BigDecimal =>
+        statement.setBigDecimal(index(), v)
+      case v: BigDecimal =>
+        statement.setBigDecimal(index(), v.bigDecimal)
 
       // Date and time types
-      case v: java.sql.Time           => statement.setTime(index(), v)
-      case v: java.sql.Timestamp      => statement.setTimestamp(index(), v)
-      case v: java.sql.Date           => statement.setDate(index(), v)
-      case v: java.util.Date          => statement.setTimestamp(index(), new java.sql.Timestamp(v.getTime))
-      case v: java.time.LocalDate     => statement.setDate(index(), java.sql.Date.valueOf(v))
-      case v: java.time.LocalTime     => statement.setTime(index(), java.sql.Time.valueOf(v))
-      case v: java.time.LocalDateTime => statement.setTimestamp(index(), java.sql.Timestamp.valueOf(v))
-      case v: java.time.Instant       => statement.setTimestamp(index(), java.sql.Timestamp.from(v))
-      case v: java.util.TimeZone      => statement.setString(index(), v.getID)
+      case v: java.sql.Time =>
+        statement.setTime(index(), v)
+      case v: java.sql.Timestamp =>
+        statement.setTimestamp(index(), v)
+      case v: java.sql.Date =>
+        statement.setDate(index(), v)
+      case v: java.util.Date =>
+        statement.setTimestamp(index(), new java.sql.Timestamp(v.getTime))
+      case v: java.time.LocalDate =>
+        statement.setDate(index(), java.sql.Date.valueOf(v))
+      case v: java.time.LocalTime =>
+        statement.setTime(index(), java.sql.Time.valueOf(v))
+      case v: java.time.LocalDateTime =>
+        statement.setTimestamp(index(), java.sql.Timestamp.valueOf(v))
+      case v: java.time.Instant =>
+        statement.setTimestamp(index(), java.sql.Timestamp.from(v))
+      case v: java.util.TimeZone =>
+        statement.setString(index(), v.getID)
 
       // Binary data
-      case v: Array[Byte]         => statement.setBytes(index(), v)
-      case v: java.sql.Blob       => statement.setBlob(index(), v)
-      case v: java.io.InputStream => statement.setBinaryStream(index(), v)
+      case v: Array[Byte] =>
+        statement.setBytes(index(), v)
+      case v: java.sql.Blob =>
+        statement.setBlob(index(), v)
+      case v: java.io.InputStream =>
+        statement.setBinaryStream(index(), v)
 
       // Character streams
       case v: java.io.Reader => statement.setCharacterStream(index(), v)
 
       // Other SQL types
-      case v: java.sql.Array => statement.setArray(index(), v)
-      case v: java.sql.Ref   => statement.setRef(index(), v)
-      case v: java.net.URL   => statement.setURL(index(), v)
+      case v: java.sql.Array =>
+        statement.setArray(index(), v)
+      case v: java.sql.Ref =>
+        statement.setRef(index(), v)
+      case v: java.net.URL =>
+        statement.setURL(index(), v)
 
       // Scala specific types
       case v: Option[_] =>
@@ -154,16 +179,20 @@ object HikariDataSource {
           case Some(value) =>
             // Recursively handle the wrapped value
             value match {
-              case null => statement.setNull(index(), java.sql.Types.NULL)
-              case _    => // Will be handled by the next iteration of pattern matching
+              case null =>
+                statement.setNull(index(), java.sql.Types.NULL)
+              case _ => // Will be handled by the next iteration of pattern matching
             }
-          case None => statement.setNull(index(), java.sql.Types.NULL)
+          case None =>
+            statement.setNull(index(), java.sql.Types.NULL)
         }
       // Fallback for AnyRef types
-      case v: AnyRef => statement.setObject(index(), v)
+      case v: AnyRef =>
+        statement.setObject(index(), v)
 
       // Final fallback - convert to string representation
-      case v: Any => statement.setString(index(), v.toString)
+      case v: Any =>
+        statement.setString(index(), v.toString)
     }
   }
 
