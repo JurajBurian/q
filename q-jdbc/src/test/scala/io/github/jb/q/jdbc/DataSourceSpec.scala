@@ -295,7 +295,7 @@ class DataSourceSpec extends FunSuite {
       assertEquals(dropTable(), 0)
     }
 
-    test("insert, select in one transaction for unmanaged should pass") {
+    test("insert and then select in one transaction for unmanaged should pass") {
       assertEquals(createTable(), 0)
       val wds = ds.write.unmanaged
       try {
@@ -306,6 +306,33 @@ class DataSourceSpec extends FunSuite {
         assertEquals(res1, res2)
       } finally { wds.close() }
     }
+  }
+  {
+    // decoders test
 
+    test("options should be supported") {
+
+      given ColumnNameMapper = ColumnNameMapper.camelToSnake
+
+      ds.write.update(
+        q"""
+           |CREATE TABLE customers (
+           |    customer_id INT PRIMARY KEY,
+           |    customer_name VARCHAR(100) NOT NULL,
+           |    city VARCHAR(50),
+           |    email VARCHAR(100)
+           |);
+           |INSERT INTO customers (customer_id, customer_name, city, email) VALUES
+           |(1, 'John Smith', 'Prague', null);""".stripMargin
+      )
+
+      case class Customer(customerId: Int, customerName: String, city: Option[String], email: Option[String])
+      given RowDecoder.TypedDecoder[Customer] = RowDecoder.derive()
+
+      val res = ds.read[Customer](q"SELECT * FROM customers order by customer_id").toList
+
+      assert(res.head.city.isDefined)
+      assert(res.head.email.isEmpty)
+    }
   }
 }
