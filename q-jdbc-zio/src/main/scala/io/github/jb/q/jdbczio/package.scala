@@ -1,6 +1,6 @@
-package com.github.jurajburian.q
+package io.github.jb.q
 
-import com.github.jurajburian.q.jdbc.HikariDataSource
+import io.github.jb.q.jdbc.HikariDataSource
 import com.zaxxer.hikari.HikariConfig
 import zio.{Chunk, Config, Scope, ZIO, ZLayer}
 
@@ -23,7 +23,7 @@ package object jdbczio {
   def makeDataSource(config: HikariConfig): ZIO[Scope, Nothing, HikariDataSource] =
     ZIO.fromAutoCloseable(ZIO.succeed(HikariDataSource.apply(config)))
 
-  def dataSource(configPath: Chunk[String]): ZLayer[Any, Throwable, HikariDataSource] =
+  def dataSource(configPath: Chunk[String] = Chunk.empty): ZLayer[Any, Throwable, HikariDataSource] =
     ZLayer.scoped(loadHikariConfig(configPath).flatMap(makeDataSource))
 
 }
